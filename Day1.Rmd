@@ -76,13 +76,294 @@ auto_corr(trees_analysis)
 cross_corr(trees_analysis)
 ```
 
+The plots show "poor chain mixing"
+
 Looking at at the plots and the outputs of auto_corr and cross_corr, ther is high autocorrelation in alpha and beta, and high cross-correlation betweenalpha and beta. The cross-correlation is intuitive because as you move the intercept up or down, the slope responds in the opposite direction. The autocorrelation is caused by the cross-correlation because in each MCMC step, the estimate of one parameter is updated based on the previous estimate of the other parameter, and back and forth...
 
+## Exercise 3:
+
+When `jaggernaut` tests for convergence, it evaluates it using `rhat` of the worst performing parameter.
+
+```{r}
+?convergence
+convergence(trees_analysis, combine = FALSE)
+
+# Can get just specific parameters:
+convergence(trees_analysis, parm = c("alpha", "beta"), combine = FALSE)
+```
+
+Run `opts_jagr()` to see the jaggernaut options. Set with `opts_jagr(option = value)` (e.g., `opts_jagr(mode = "paper")` or `opts_jagr(nsamples = 5000)`).
 
 
+## Exercise 4:
+To run more iterations (e.g., to get better convergence):
 
+N.B. Thinning 10,000 iterations down to 500 gets rid of the autocorrelation.
 
+```{r}
+trees_analysis <- jags_analysis(tree_model, data = trees, niter = 10^4)
+plot(trees_analysis)
+coef(trees_analysis)
+convergence(trees_analysis, combine = FALSE)
+```
 
+If you center the intercept on the x variable (girth), it will break the cross-correlation between the slope and intercept because you can now change the slope without affecting the intercept, and vice-versa.
 
-graphics.off()
-rm(list = ls())
+## Exercise 5:
+
+```{r}
+## Option 1 Transform the variable:
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * Girth[i]
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+trees$Girth <- trees$Girth - mean(trees$Girth)
+
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+auto_corr(trees_analysis)
+cross_corr(trees_analysis)
+
+data(trees) # Reset trees after changing the Girth column
+
+## Option 2 (in the BUGS code):
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * (Girth[i] - mean(Girth))
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+auto_corr(trees_analysis)
+cross_corr(trees_analysis)
+
+## Option 3:
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * Girth[i]
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+select_data(tree_model) <- c("Volume", "Girth+") # The `+` centers the Girth parameter
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+auto_corr(trees_analysis)
+cross_corr(trees_analysis)
+```
+
+## Exercise 6:
+
+```{r}
+derived_code <- "data {
+  for(i in 1:length(Volume)) { 
+    prediction[i] <- alpha + beta * Girth[i]
+
+    simulated[i] ~ dnorm(prediction[i], sigma^-2)
+
+    D_observed[i] <- log(dnorm(Volume[i], prediction[i], sigma^-2))
+    D_simulated[i] <- log(dnorm(simulated[i], prediction[i], sigma^-2))
+  }
+  residual <- (Volume - prediction) / sigma
+  discrepancy <- sum(D_observed) - sum(D_simulated)
+}"
+
+predicted <- predict(trees_analysis, newdata = "Girth", derived_code = derived_code)
+
+new.data <- data.frame(Girth = 8)
+
+predicted2 <- predict(trees_analysis, newdata = new.data, derived_code = derived_code)
+predicted2
+```
+
+The 95% prediction interval is `r predicted2[,"lower"]` to `r predicted2[,"upper"]`
+
+## Exercise 9:
+
+To fit the allometric relationship, log the parameters in the `select_data()` call
+
+```{r}
+data(trees)
+
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * Girth[i]
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+select_data(tree_model) <- c("log(Volume)", "log(Girth)+")
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+
+derived_code <- "data {
+  for(i in 1:length(Volume)) { 
+    prediction[i] <- alpha + beta * Girth[i]
+
+    simulated[i] ~ dnorm(prediction[i], sigma^-2)
+
+    D_observed[i] <- log(dnorm(Volume[i], prediction[i], sigma^-2))
+    D_simulated[i] <- log(dnorm(simulated[i], prediction[i], sigma^-2))
+  }
+  residual <- (Volume - prediction) / sigma
+  discrepancy <- sum(D_observed) - sum(D_simulated)
+}"
+
+predicted <- predict(trees_analysis, newdata = "Girth", derived_code = derived_code)
+simulated <- predict(trees_analysis, parm = "simulated", newdata = "Girth", 
+                     derived_code = derived_code)
+
+## Need to exponentiate the predicted values to get them back into regular parameter space:
+
+gp <- ggplot(predicted, aes(x = Girth, y = exp(estimate))) + 
+  geom_point(data = dataset(trees_analysis), aes(y = Volume)) + 
+  geom_line() + 
+  geom_line(aes(y = exp(lower)), linetype = "dashed") + 
+  geom_line(aes(y = exp(upper)), linetype = "dashed") + 
+  geom_line(data = simulated, aes(y = lower), linetype = "dotted") + 
+  geom_line(data = simulated, aes(y = upper), linetype = "dotted") + 
+  scale_y_continuous(name = "Volume")
+
+gp
+```
+
+You can also specify `log(predicted)` to generate back-transformed predicted values and use `dlnorm` to generate the simulated data in the derived code, :
+
+```{r}
+data(trees)
+
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * Girth[i]
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+select_data(tree_model) <- c("log(Volume)", "log(Girth)+")
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+
+derived_code <- "data {
+  for(i in 1:length(Volume)) { 
+    log(prediction[i]) <- alpha + beta * Girth[i]
+
+    simulated[i] ~ dlnorm(log(prediction[i]), sigma^-2)
+
+    D_observed[i] <- log(dnorm(Volume[i], prediction[i], sigma^-2))
+    D_simulated[i] <- log(dnorm(simulated[i], prediction[i], sigma^-2))
+  }
+  residual <- (Volume - prediction) / sigma
+  discrepancy <- sum(D_observed) - sum(D_simulated)
+}"
+
+predicted <- predict(trees_analysis, newdata = "Girth", derived_code = derived_code)
+simulated <- predict(trees_analysis, parm = "simulated", newdata = "Girth", 
+                     derived_code = derived_code)
+
+## Need to exponentiate the predicted values to get them back into regular parameter space:
+
+gp <- ggplot(predicted, aes(x = Girth, y = estimate)) + 
+  geom_point(data = dataset(trees_analysis), aes(y = Volume)) + 
+  geom_line() + 
+  geom_line(aes(y = lower), linetype = "dashed") + 
+  geom_line(aes(y = upper), linetype = "dashed") + 
+  geom_line(data = simulated, aes(y = lower), linetype = "dotted") + 
+  geom_line(data = simulated, aes(y = upper), linetype = "dotted") + 
+  scale_y_continuous(name = "Volume")
+
+gp
+```
+
+## Exercise 10:
+
+```{r}
+data(trees)
+
+tree_model <- jags_model("
+model {
+  alpha ~ dnorm(0, 50^-2)
+  beta ~ dnorm(0, 50^-2)
+  betaHeight ~ dnorm(0, 50^-2)
+  sigma ~ dunif(0, 10)
+  
+  for (i in 1:length(Volume)) {
+    eMu[i] <- alpha + beta * Girth[i] + betaHeight * Height[i]
+    Volume[i] ~ dnorm(eMu[i], sigma^-2)
+  }
+}")
+
+select_data(tree_model) <- c("log(Volume)", "log(Girth)+", "log(Height)+")
+trees_analysis <- jags_analysis(tree_model, data = trees)
+plot(trees_analysis)
+coef(trees_analysis)
+
+derived_code <- "data {
+  for(i in 1:length(Volume)) { 
+    log(prediction[i]) <- alpha + beta * Girth[i] + betaHeight * Height[i]
+
+    simulated[i] ~ dlnorm(log(prediction[i]), sigma^-2)
+
+    D_observed[i] <- log(dnorm(Volume[i], prediction[i], sigma^-2))
+    D_simulated[i] <- log(dnorm(simulated[i], prediction[i], sigma^-2))
+  }
+  residual <- (Volume - prediction) / sigma
+  discrepancy <- sum(D_observed) - sum(D_simulated)
+}"
+
+predicted <- predict(trees_analysis, newdata = c("Girth", "Height"), 
+                     derived_code = derived_code, length_out = 10)
+
+simulated <- predict(trees_analysis, parm = "simulated", newdata = "Girth", 
+                     derived_code = derived_code, length_out = 10)
+
+gp <- ggplot(predicted, aes(x = Girth, y = estimate)) + 
+  facet_wrap(~ Height) + 
+  geom_point(data = dataset(trees_analysis), aes(y = Volume)) + 
+  geom_line() + 
+  geom_line(aes(y = lower), linetype = "dashed") + 
+  geom_line(aes(y = upper), linetype = "dashed") + 
+  geom_line(data = simulated, aes(y = lower), linetype = "dotted") + 
+  geom_line(data = simulated, aes(y = upper), linetype = "dotted") + 
+  scale_y_continuous(name = "Volume")
+
+gp
+
+```
+
+As the parameter estimate for Height is different from zero, it is a likely addition to the model.
+
