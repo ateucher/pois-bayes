@@ -85,7 +85,7 @@ Looking at at the plots and the outputs of auto_corr and cross_corr, ther is hig
 When `jaggernaut` tests for convergence, it evaluates it using `rhat` of the worst performing parameter.
 
 ```{r}
-?convergence
+# ?convergence
 convergence(trees_analysis, combine = FALSE)
 
 # Can get just specific parameters:
