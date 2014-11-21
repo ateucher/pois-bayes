@@ -1,0 +1,65 @@
+---
+title: "Peregrine Falcons"
+author: "Andy Teucher"
+date: "November 21, 2014"
+output: html_document
+---
+
+```{r}
+source("header.R")
+```
+
+```{r}
+data(peregrine)
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 100^-2)
+  beta ~ dnorm(0, 100^-2)
+  sigma ~ dunif(0, 100)
+  for(i in 1:length(Pairs)) {
+    ePairs[i] <- alpha + beta * Year[i]
+    Pairs[i] ~ dnorm(ePairs[i], sigma^-2)
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    prediction[i] <- alpha + beta * Year[i]
+  }
+}",
+select_data = c("Pairs", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+                     
+```
+
+## Exercise 16 (rerun with year not centered):
+
+```{r}
+select_data(model1) <- c("Pairs", "Year")
+
+analysis2 <- jags_analysis(model1, data = peregrine)
+coef(analysis2)
+
+pred2 <- predict(analysis2)
+
+gp <- gp %+% pred2
+gp
+```
+
+
