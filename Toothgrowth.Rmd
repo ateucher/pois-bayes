@@ -1,0 +1,188 @@
+---
+title: "Toothgrowth"
+author: "Andy Teucher"
+date: "November 20, 2014"
+output: html_document
+---
+
+```{r}
+source("header.R")
+```
+
+
+```{r}
+data(ToothGrowth)
+
+model1 <- jags_model("model {
+  for(i in 1:nsupp) {
+    alpha[i] ~ dnorm(0, 40^-2)
+  }
+  beta ~ dnorm(0, 20^-2)
+  sigma ~ dunif(0, 20)
+
+  for(i in 1:length(len)) { 
+    eLen[i] <- alpha[supp[i]] + beta * dose[i]
+    len[i] ~ dnorm(eLen[i], sigma^-2)
+  } 
+}",
+derived_code  = " data{
+  for(i in 1:length(len)) { 
+    prediction[i] <- alpha[supp[i]] + beta * dose[i]
+  }
+  residual <- (len - prediction) / sigma
+}")
+
+analysis1 <- jags_analysis(model1, data = ToothGrowth)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1, newdata = c("supp", "dose"))
+
+gp <- ggplot(data = prediction, aes(x = dose, y = estimate, color = supp, 
+    shape = supp))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = len))
+gp <- gp + geom_line()
+gp <- gp + scale_y_continuous(name = "len")
+
+gp
+
+residuals <- residuals(analysis1)
+residuals$fitted <- fitted(analysis1)$estimate
+
+qplot(fitted, estimate, color = supp, shape = supp, data = residuals, xlab = "Fitted", 
+    ylab = "Residual") + geom_hline(yintercept = 0)
+```
+
+## Exercise 11:
+
+```{r}
+predictive_check(analysis1, newdata = "", 
+                 derived_code = "data{ discrepancy <- alpha[1] - alpha[2]}")
+
+## OR reparameterize the model by setting a base case and an effect
+
+
+
+```
+
+
+## Exercise 13:
+
+```{r}
+data(ToothGrowth)
+
+tg_ancova <- jags_model("model {
+  for(i in 1:nsupp) {
+    alpha[i] ~ dnorm(0, 40^-2)
+  }
+  beta ~ dnorm(0, 20^-2)
+  sigma ~ dunif(0, 20)
+
+  for(i in 1:length(len)) { 
+    eLen[i] <- alpha[supp[i]] + beta * dose[i]
+    len[i] ~ dnorm(eLen[i], sigma^-2)
+  } 
+}",
+derived_code  = " data{
+  for(i in 1:length(len)) { 
+    prediction[i] <- alpha[supp[i]] + beta * dose[i]
+  }
+  residual <- (len - prediction) / sigma
+}", 
+model_id = "ancova")
+
+tg_regression <- jags_model("model {
+  alpha ~ dnorm(0, 40^-2)
+  beta ~ dnorm(0, 20^-2)
+  sigma ~ dunif(0, 20)
+
+  for(i in 1:length(len)) { 
+    eLen[i] <- alpha + beta * dose[i]
+    len[i] ~ dnorm(eLen[i], sigma^-2)
+  } 
+}",
+derived_code  = " data{
+  for(i in 1:length(len)) { 
+    prediction[i] <- alpha + beta * dose[i]
+  }
+  residual <- (len - prediction) / sigma
+}", 
+model_id = "regression")
+
+tg_anova <- jags_model("model {
+  for(i in 1:nsupp) {
+    alpha[i] ~ dnorm(0, 40^-2)
+  }
+  sigma ~ dunif(0, 20)
+
+  for(i in 1:length(len)) { 
+    eLen[i] <- alpha[supp[i]]
+    len[i] ~ dnorm(eLen[i], sigma^-2)
+  } 
+}",
+derived_code  = " data{
+  for(i in 1:length(len)) { 
+    prediction[i] <- alpha[supp[i]]
+  }
+  residual <- (len - prediction) / sigma
+}", 
+model_id = "anova")
+
+tg_ancova_int <- jags_model("model {
+  for(i in 1:nsupp) {
+    alpha[i] ~ dnorm(0, 40^-2)
+    beta[i] ~ dnorm(0, 20^-2)
+  }
+  sigma ~ dunif(0, 20)
+
+  for(i in 1:length(len)) { 
+    eLen[i] <- alpha[supp[i]] + beta[supp[i]] * dose[i]
+    len[i] ~ dnorm(eLen[i], sigma^-2)
+  } 
+}",
+derived_code  = " data{
+  for(i in 1:length(len)) { 
+    prediction[i] <- alpha[supp[i]] + beta[supp[i]] * dose[i]
+  }
+  residual <- (len - prediction) / sigma
+}", 
+model_id = "ancova_int")
+
+models <- combine(tg_ancova, tg_ancova_int, tg_anova, tg_regression)
+
+tg_analysis <- jags_analysis(models, data = ToothGrowth)
+
+prediction <- predict(tg_analysis, newdata = c("supp", "dose"), 
+                      model_id = "regression")
+
+gp <- gp %+% prediction # updates the data in the gp object
+
+```
+
+## Exercise 15:
+
+```{r}
+model_ids <- model_id(tg_analysis)
+
+predictions <- data.frame()
+
+for (id in model_ids) {
+  pred <- predict(tg_analysis, newdata = c("supp", "dose"), model_id = id, 
+                  base = data.frame(supp = "VC", base = 0.5))
+  
+  pred$id <- id
+  
+  predictions <- rbind(predictions, pred)
+  
+  }
+
+gp <- ggplot(predictions, aes(x = dose, y = estimate, color = supp, 
+                              shape = supp)) +
+  facet_wrap(~ id) +
+  geom_line() + 
+  scale_y_continuous(name = "Effect on len (%)", labels = percent)
+
+plot(gp)
+```
+
