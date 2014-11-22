@@ -16,6 +16,7 @@ model1 <- jags_model("model {
   alpha ~ dnorm(0, 100^-2)
   beta ~ dnorm(0, 100^-2)
   sigma ~ dunif(0, 100)
+  
   for(i in 1:length(Pairs)) {
     ePairs[i] <- alpha + beta * Year[i]
     Pairs[i] ~ dnorm(ePairs[i], sigma^-2)
@@ -62,4 +63,501 @@ gp <- gp %+% pred2
 gp
 ```
 
+## Exercise 17 (use a log-link function so can't include 0 Pairs):
+
+```{r}
+data(peregrine)
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 100^-2)
+  beta ~ dnorm(0, 100^-2)
+  sigma ~ dunif(0, 100)
+  
+  for(i in 1:length(Pairs)) {
+    log(ePairs[i]) <- alpha + beta * Year[i] # Add log
+    Pairs[i] ~ dnorm(ePairs[i], sigma^-2)
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    log(prediction[i]) <- alpha + beta * Year[i] # Add log
+  }
+}",
+select_data = c("Pairs", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+## Exercise 18 (use poisson distribution):
+
+```{r}
+data(peregrine)
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 100^-2)
+  beta ~ dnorm(0, 100^-2) 
+  # Removed sigma because not used in the model (in pois mean = var)
+  
+  for(i in 1:length(Pairs)) {
+    log(ePairs[i]) <- alpha + beta * Year[i] # Add log
+    Pairs[i] ~ dpois(ePairs[i]) # use a Poisson distribution because counts
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    log(prediction[i]) <- alpha + beta * Year[i] # Add log
+  }
+}",
+select_data = c("Pairs", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+### A bit of off-roading to look at over-dispersed poisson:
+
+This adds a new parameter with a gamma distribution to introduce more variation
+in the point estimates
+
+```{r}
+data(peregrine)
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 100^-2)
+  beta ~ dnorm(0, 100^-2) 
+  sDispersion ~ dunif(0,5)
+  
+  for(i in 1:length(Pairs)) {
+    eDispersion[i] ~ dgamma(1 / sDispersion^2, 1 / sDispersion^2)
+    log(ePairs[i]) <- alpha + beta * Year[i] # Add log
+    Pairs[i] ~ dpois(ePairs[i] * eDispersion[i]) # include dispersion
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    log(prediction[i]) <- alpha + beta * Year[i] # Add log
+  }
+}",
+select_data = c("Pairs", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+## Exercise 19:
+
+Add a second-order (quadratic) polynomial to the overdispersed model
+
+```{r}
+data(peregrine)
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 100^-2)
+  beta ~ dnorm(0, 100^-2)
+  beta2 ~ dnorm(0, 100^-2)
+  beta3 ~ dnorm(0, 100^-2)
+  sDispersion ~ dunif(0,5)
+  
+  for(i in 1:length(Pairs)) {
+    eDispersion[i] ~ dgamma(1 / sDispersion^2, 1 / sDispersion^2)
+    log(ePairs[i]) <- alpha + beta * Year[i] + beta2 * Year[i]^2 + beta3 * Year[i]^3
+    Pairs[i] ~ dpois(ePairs[i] * eDispersion[i]) # include dispersion
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    log(prediction[i]) <- alpha + beta * Year[i] + beta2 * Year[i]^2 + beta3 * Year[i]^3
+  }
+}",
+select_data = c("Pairs", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+coef(analysis1)
+plot(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+Note that the support for the `sDispersion` parameter is decreasing as the third order polynomial is explaining more of the variation. The percent error is still relatively low (~50, wich is < 80), so we will keep it.
+
+## Exercise 21:
+
+```{r}
+pred2 <- predict(analysis1, newdata = data.frame(Year = as.integer(2006)))
+```
+
+The third-order polynomial predicts that there will be `r pred2$estimate` in 2006.
+
+## State-Space Population Growth Models
+
+```{r}
+data(peregrine)
+
+model6 <- jags_model("model {
+  mean_r ~ dnorm(0, 1^-2)
+  sd_r ~ dunif(0, 1)
+  logN[1] ~ dnorm(0, 10^-2)
+  
+  for(i in 2:nYear) {
+    r[i-1] ~ dnorm(mean_r, sd_r^-2)
+    logN[i] <- logN[i-1] + r[i-1]
+  }
+  
+  for(i in 1:length(Pairs)) {
+    Pairs[i] ~ dpois(exp(logN[Year[i]]))
+  }
+  
+  logN1 <- logN[1]
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    log(prediction[i]) <- logN[Year[i]]
+  }
+}",
+select_data = c("Pairs", "Year"),
+random_effects = list(r = "Year", logN = "Year"))
+
+## Need Year as a factor for the loop
+peregrine$Year <- factor(peregrine$Year)
+analysis_ss <- jags_analysis(model6, data = peregrine)
+coef(analysis_ss)
+
+prediction <- predict(analysis_ss)
+
+gp <- ggplot(data = prediction, 
+             aes(x = as.integer(as.character(Year)), y = estimate))
+gp <- gp + geom_point(data = dataset(analysis_ss), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+## Exercise 22:
+
+```{r}
+## Predict as percent change since 1970
+prediction <- predict(analysis_ss, base = data.frame(Year = as.factor(1970)))
+
+gp <- ggplot(data = prediction, 
+             aes(x = as.integer(as.character(Year)), y = estimate))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "% Change since 1970")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+The estimated percent change in 2003 since 1970 is `r prediction$estimate[prediction$Year == 2003]` (95% CI: `r prediction$lower[prediction$Year == 2003]` to `r prediction$upper[prediction$Year == 2003]`)
+
+## Exercise 23:
+
+Predict years up to 2008:
+
+```{r}
+data(peregrine)
+
+## Add the years you want to predict for
+peregrine_padded <- left_join(data.frame(Year = min(peregrine$Year):2008), 
+                       peregrine)
+
+## Need Year as a factor for the loop
+peregrine_padded$Year <- factor(peregrine_padded$Year)
+analysis_pred <- jags_analysis(model6, data = peregrine_padded)
+coef(analysis_pred)
+
+prediction_pred <- predict(analysis_pred)
+
+gp <- ggplot(data = prediction_pred, 
+             aes(x = as.integer(as.character(Year)), y = estimate))
+gp <- gp + geom_point(data = dataset(analysis_pred), aes(y = Pairs))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = 0)
+
+print(gp)
+```
+
+## Exercise 25: Breeding Success
+
+Add a second-order polynial to original linear model
+
+```{r}
+data(peregrine)
+
+peregrine$Proportion <- peregrine$R.Pairs / peregrine$Pairs
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 1^-2)
+  beta ~ dnorm(0, 1^-2)
+  beta2 ~ dnorm(0, 1^-2) ## Added beta2
+  sigma ~ dunif(0, 1)
+  
+  for(i in 1:length(Proportion)) {
+    eProportion[i] <- alpha + beta * Year[i] + beta2*Year[i]^2 ## Add the quadratic term
+    Proportion[i] ~ dnorm(eProportion[i], sigma^-2)
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Proportion)) {
+    prediction[i] <- alpha + beta * Year[i] + beta2*Year[i]^2 ## Quadratic here too
+  }
+}",
+select_data = c("Proportion", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Proportion))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = c(0, 1))
+
+print(gp)
+```
+
+But there is a problem: the polynomial could allow expected values of < 0 or > 1.
+Use a logistic link function...
+
+## Exercise 26:
+
+```{r}
+data(peregrine)
+
+peregrine$Proportion <- peregrine$R.Pairs / peregrine$Pairs
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 1^-2)
+  beta ~ dnorm(0, 1^-2)
+  beta2 ~ dnorm(0, 1^-2) ## Added beta2
+  sigma ~ dunif(0, 1)
+  
+  for(i in 1:length(Proportion)) {
+    logit(eProportion[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2
+    Proportion[i] ~ dnorm(eProportion[i], sigma^-2)
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Proportion)) {
+    logit(prediction[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2 ## Quadratic here too
+  }
+}",
+select_data = c("Proportion", "Year+"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Proportion))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = c(0, 1))
+
+print(gp)
+
+## Look at tails to see it now doesn't go to zero:
+pred <- predict(analysis1, data.frame(Year = 1940:2025))
+gp %+% pred
+
+```
+
+## Exercise 27:
+
+```{r}
+data(peregrine)
+
+peregrine$Proportion <- peregrine$R.Pairs / peregrine$Pairs
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 1^-2)
+  beta ~ dnorm(0, 1^-2)
+  beta2 ~ dnorm(0, 1^-2) ## Added beta2
+  
+  for(i in 1:length(Pairs)) {
+    logit(eProportion[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2
+    R.Pairs[i] ~ dbin(eProportion[i], Pairs[i])
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    logit(prediction[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2
+  }
+}",
+select_data = c("Year+", "Pairs", "R.Pairs"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Proportion))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = c(0, 1))
+
+print(gp)
+```
+
+## Exercise 29: Add overdispersion to binomial distribution
+
+```{r}
+data(peregrine)
+
+peregrine$Proportion <- peregrine$R.Pairs / peregrine$Pairs
+
+model1 <- jags_model("model {
+  alpha ~ dnorm(0, 1^-2)
+  beta ~ dnorm(0, 1^-2)
+  beta2 ~ dnorm(0, 1^-2)
+  sDispersion ~ dunif(0,5) ## Add prior for overdispersion parameter
+  
+  for(i in 1:length(Pairs)) {
+    eDispersion[i] ~ dnorm(0, sDispersion^-2)
+    logit(eProportion[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2 + eDispersion[i]
+    R.Pairs[i] ~ dbin(eProportion[i], Pairs[i])
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(Pairs)) {
+    logit(prediction[i]) <- alpha + beta * Year[i] + beta2*Year[i]^2
+  }
+}",
+select_data = c("Year+", "Pairs", "R.Pairs"))
+
+analysis1 <- jags_analysis(model1, data = peregrine)
+coef(analysis1)
+
+prediction <- predict(analysis1)
+
+gp <- ggplot(data = prediction, aes(x = Year, y = estimate))
+gp <- gp + geom_point(data = dataset(analysis1), aes(y = Proportion))
+gp <- gp + geom_line()
+gp <- gp + geom_line(aes(y = lower), linetype = "dashed")
+gp <- gp + geom_line(aes(y = upper), linetype = "dashed")
+gp <- gp + scale_x_continuous(name = "Year")
+gp <- gp + scale_y_continuous(name = "Pairs")
+gp <- gp + expand_limits(y = c(0, 1))
+
+print(gp)
+```
+
+The percent error in the coefficient table for sDispersion is relatively low, so unlikely to include zero.  This means it's probably important.
+
+## Add overdispersion correction to AR model:
+
+```{r}
+model2 <- jags_model("model {
+  theta[1] ~ dnorm(0, 2^-2)
+  sigma ~ dunif(0, 2)
+  for(i in 2:length(R.Pairs)) {
+    theta[i] ~ dnorm(theta[i-1], sigma^-2)
+  }
+  sDispersion ~ dunif(0, 5)
+  
+  for(i in 1:length(R.Pairs)) {
+    eDispersion[i] ~ dnorm(0, sDispersion^-2)
+    logit(eProportion[i]) <- theta[i] + eDispersion[i]
+    R.Pairs[i] ~ dbin(eProportion[i], Pairs[i])
+  }
+}",
+derived_code = "data {
+  for(i in 1:length(R.Pairs)) {
+    logit(prediction[i]) <- theta[Year[i]]
+  }
+}",
+random_effect = list(theta = "Year"),
+select_data = c("R.Pairs", "Pairs", "Year"))
+
+data(peregrine)
+peregrine$Year <- factor(peregrine$Year)
+
+analysis2 <- jags_analysis(model2, data = peregrine)
+
+prediction <- predict(analysis2)
+
+gp <- gp + aes(as.integer(as.character(Year)))
+gp <- gp %+% prediction
+
+print(gp)
+```
 
