@@ -2,9 +2,7 @@
 title: "Day 1"
 author: "Andy Teucher"
 date: "November 20, 2014"
-output:
-  html_document:
-    keep_md: true
+output: md_document
 ---
 
 ```{r}

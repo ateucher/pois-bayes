@@ -1,24 +1,4 @@
     source("header.R")
-
-    ## 
-    ## Attaching package: 'dplyr'
-    ## 
-    ## The following object is masked from 'package:stats':
-    ## 
-    ##     filter
-    ## 
-    ## The following objects are masked from 'package:base':
-    ## 
-    ##     intersect, setdiff, setequal, union
-    ## 
-    ## Loading required package: foreach
-    ## foreach: simple, scalable parallel programming from Revolution Analytics
-    ## Use Revolution R for scalability, fault tolerance and more.
-    ## http://www.revolutionanalytics.com
-    ## Loading required package: doParallel
-    ## Loading required package: iterators
-    ## Loading required package: parallel
-
     library(bayesm)
     data(cheese)
 
