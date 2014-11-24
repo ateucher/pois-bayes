@@ -5,35 +5,9 @@ November 20, 2014
 
 ```r
 library(dplyr)
-```
-
-```
-## 
-## Attaching package: 'dplyr'
-## 
-## The following object is masked from 'package:stats':
-## 
-##     filter
-## 
-## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union
-```
-
-```r
 library(ggplot2)
 library(scales)
 library(jaggernaut)
-```
-
-```
-## Loading required package: foreach
-## Loading required package: doParallel
-## Loading required package: iterators
-## Loading required package: parallel
-```
-
-```r
 options(digits = 4)
 ```
 
@@ -59,7 +33,7 @@ analysis1 <- jags_analysis(model1, data = data)
 ```
 
 ```
-## Analysis converged (rhat:1.01)
+## Analysis converged (rhat:1)
 ```
 
 ```r
@@ -73,8 +47,8 @@ coef(analysis1)
 ```
 
 ```
-##       estimate  lower  upper     sd error significance
-## theta   0.3063 0.1041 0.4824 0.1018    62            0
+##       estimate lower  upper     sd error significance
+## theta    0.297 0.102 0.4831 0.1033    64            0
 ```
 
 ## Black Cherry Trees
@@ -116,6 +90,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
+## Resampling due to convergence failure (rhat:1.21)
 ## Analysis converged (rhat:1.03)
 ```
 
@@ -131,9 +106,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate   lower   upper     sd error significance
-## alpha  -37.730 -43.790 -30.345 3.5002    18            0
-## beta     5.124   4.595   5.583 0.2560    10            0
-## sigma    4.440   3.467   5.797 0.5897    26            0
+## alpha  -36.338 -43.396 -29.451 3.4629    19            0
+## beta     5.021   4.514   5.554 0.2551    10            0
+## sigma    4.406   3.409   5.795 0.6201    27            0
 ```
 
 ## Exercise 2:
@@ -144,11 +119,11 @@ auto_corr(trees_analysis)
 ```
 
 ```
-##          alpha    beta     sigma
-## Lag 1  0.93805 0.93877  0.273047
-## Lag 5  0.71576 0.72352  0.043968
-## Lag 10 0.53311 0.52968  0.030729
-## Lag 50 0.02111 0.01432 -0.005328
+##           alpha     beta     sigma
+## Lag 1   0.88041  0.88450  0.198459
+## Lag 5   0.50463  0.50682 -0.008219
+## Lag 10  0.21445  0.21845 -0.014930
+## Lag 50 -0.06992 -0.06524  0.022602
 ```
 
 ```r
@@ -157,9 +132,9 @@ cross_corr(trees_analysis)
 
 ```
 ##          alpha     beta    sigma
-## alpha  1.00000 -0.97403 -0.06477
-## beta  -0.97403  1.00000  0.06875
-## sigma -0.06477  0.06875  1.00000
+## alpha  1.00000 -0.97334  0.02447
+## beta  -0.97334  1.00000 -0.02468
+## sigma  0.02447 -0.02468  1.00000
 ```
 
 The plots show "poor chain mixing"
@@ -179,8 +154,8 @@ convergence(trees_analysis, combine = FALSE)
 ```
 ##       convergence
 ## alpha        1.03
-## beta         1.02
-## sigma        1.01
+## beta         1.03
+## sigma        1.00
 ```
 
 ```r
@@ -191,7 +166,7 @@ convergence(trees_analysis, parm = c("alpha", "beta"), combine = FALSE)
 ```
 ##       convergence
 ## alpha        1.03
-## beta         1.02
+## beta         1.03
 ```
 
 Run `opts_jagr()` to see the jaggernaut options. Set with `opts_jagr(option = value)` (e.g., `opts_jagr(mode = "paper")` or `opts_jagr(nsamples = 5000)`).
@@ -223,9 +198,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate   lower   upper     sd error significance
-## alpha  -36.892 -43.889 -29.843 3.5800    19            0
-## beta     5.062   4.530   5.567 0.2635    10            0
-## sigma    4.464   3.442   5.942 0.6313    28            0
+## alpha  -36.687 -43.758 -30.047 3.5035    19            0
+## beta     5.048   4.540   5.573 0.2586    10            0
+## sigma    4.441   3.457   5.813 0.6277    27            0
 ```
 
 ```r
@@ -264,7 +239,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
-## Analysis converged (rhat:1.02)
+## Analysis converged (rhat:1)
 ```
 
 ```r
@@ -279,9 +254,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate  lower  upper     sd error significance
-## alpha   30.152 28.552 31.631 0.7816     5            0
-## beta     5.070  4.578  5.576 0.2546    10            0
-## sigma    4.458  3.426  6.009 0.6414    29            0
+## alpha   30.170 28.582 31.765 0.8088     5            0
+## beta     5.075  4.589  5.602 0.2569    10            0
+## sigma    4.436  3.443  5.757 0.5914    26            0
 ```
 
 ```r
@@ -289,11 +264,11 @@ auto_corr(trees_analysis)
 ```
 
 ```
-##            alpha     beta     sigma
-## Lag 1  -0.002762 -0.07164  0.383701
-## Lag 5  -0.006117  0.01866  0.015936
-## Lag 10 -0.058382 -0.01291  0.045720
-## Lag 50 -0.004133 -0.02850 -0.004687
+##             alpha      beta   sigma
+## Lag 1  -0.0450927 -0.036712 0.30669
+## Lag 5  -0.0480811 -0.036315 0.03715
+## Lag 10  0.0131601  0.001223 0.02109
+## Lag 50 -0.0007313  0.022115 0.00490
 ```
 
 ```r
@@ -301,10 +276,10 @@ cross_corr(trees_analysis)
 ```
 
 ```
-##          alpha     beta    sigma
-## alpha  1.00000 -0.01042  0.01529
-## beta  -0.01042  1.00000 -0.02152
-## sigma  0.01529 -0.02152  1.00000
+##           alpha      beta    sigma
+## alpha  1.000000 -0.004765 -0.02609
+## beta  -0.004765  1.000000  0.02817
+## sigma -0.026091  0.028165  1.00000
 ```
 
 ```r
@@ -342,9 +317,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate  lower  upper     sd error significance
-## alpha   30.153 28.693 31.731 0.7820     5            0
-## beta     5.065  4.547  5.581 0.2567    10            0
-## sigma    4.420  3.412  5.814 0.6144    27            0
+## alpha   30.141 28.580 31.769 0.8056     5            0
+## beta     5.068  4.547  5.613 0.2695    11            0
+## sigma    4.446  3.462  5.892 0.6159    27            0
 ```
 
 ```r
@@ -352,11 +327,11 @@ auto_corr(trees_analysis)
 ```
 
 ```
-##             alpha      beta    sigma
-## Lag 1   0.0008889 -0.044572  0.30127
-## Lag 5   0.0327593  0.001336  0.01419
-## Lag 10  0.0227428 -0.021476 -0.02441
-## Lag 50 -0.0102427 -0.019008 -0.01826
+##           alpha     beta    sigma
+## Lag 1   0.02609  0.01016  0.36329
+## Lag 5  -0.00760 -0.01670  0.01873
+## Lag 10 -0.03555  0.07891 -0.02026
+## Lag 50 -0.03013  0.02749 -0.02480
 ```
 
 ```r
@@ -364,10 +339,10 @@ cross_corr(trees_analysis)
 ```
 
 ```
-##           alpha     beta     sigma
-## alpha  1.000000 0.080010 -0.008529
-## beta   0.080010 1.000000  0.001002
-## sigma -0.008529 0.001002  1.000000
+##            alpha      beta      sigma
+## alpha  1.0000000 0.0002657 -0.0256499
+## beta   0.0002657 1.0000000  0.0008297
+## sigma -0.0256499 0.0008297  1.0000000
 ```
 
 ```r
@@ -389,7 +364,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
-## Analysis converged (rhat:1.01)
+## Analysis converged (rhat:1)
 ```
 
 ```r
@@ -404,9 +379,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate  lower  upper     sd error significance
-## alpha   30.138 28.548 31.783 0.8066     5            0
-## beta     5.064  4.554  5.588 0.2616    10            0
-## sigma    4.440  3.374  5.856 0.6460    28            0
+## alpha   30.140 28.588 31.745 0.7975     5            0
+## beta     5.072  4.541  5.595 0.2658    10            0
+## sigma    4.410  3.463  5.688 0.5811    25            0
 ```
 
 ```r
@@ -414,11 +389,11 @@ auto_corr(trees_analysis)
 ```
 
 ```
-##            alpha      beta    sigma
-## Lag 1   0.050444 -0.007754  0.30613
-## Lag 5   0.027901 -0.022202 -0.02034
-## Lag 10  0.001214  0.027737  0.03592
-## Lag 50 -0.030463  0.008991 -0.04902
+##            alpha     beta    sigma
+## Lag 1   0.009700 -0.03382  0.29745
+## Lag 5  -0.012952  0.01844  0.04414
+## Lag 10 -0.006907  0.00375  0.01456
+## Lag 50 -0.008593  0.01210 -0.06306
 ```
 
 ```r
@@ -426,10 +401,10 @@ cross_corr(trees_analysis)
 ```
 
 ```
-##          alpha     beta   sigma
-## alpha  1.00000 -0.01035 0.03188
-## beta  -0.01035  1.00000 0.01753
-## sigma  0.03188  0.01753 1.00000
+##          alpha      beta    sigma
+## alpha 1.000000  0.004763  0.01597
+## beta  0.004763  1.000000 -0.01221
+## sigma 0.015967 -0.012209  1.00000
 ```
 
 ## Exercise 6:
@@ -459,10 +434,10 @@ predicted2
 
 ```
 ##   Girth Height Volume estimate  lower upper    sd error significance
-## 1     8     76  30.17    3.558 0.4506 6.777 1.599    89        0.028
+## 1     8     76  30.17    3.519 0.2256 6.656 1.604    91       0.0347
 ```
 
-The 95% prediction interval is 0.4506 to 6.7773
+The 95% prediction interval is 0.2256 to 6.6558
 
 ## Exercise 9:
 
@@ -489,7 +464,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
-## Analysis converged (rhat:1.01)
+## Analysis converged (rhat:1)
 ```
 
 ```r
@@ -504,9 +479,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate   lower  upper      sd error significance
-## alpha   3.2734 3.22915 3.3146 0.02156     1            0
-## beta    2.1989 2.00622 2.3839 0.09653     9            0
-## sigma   0.1203 0.09359 0.1573 0.01641    26            0
+## alpha   3.2715 3.22945 3.3144 0.02164     1            0
+## beta    2.1979 2.00250 2.3826 0.09671     9            0
+## sigma   0.1209 0.09235 0.1572 0.01687    27            0
 ```
 
 ```r
@@ -566,7 +541,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
-## Analysis converged (rhat:1.03)
+## Analysis converged (rhat:1)
 ```
 
 ```r
@@ -581,9 +556,9 @@ coef(trees_analysis)
 
 ```
 ##       estimate   lower  upper      sd error significance
-## alpha   3.2734 3.23073 3.3177 0.02192     1            0
-## beta    2.2013 2.01600 2.3757 0.09513     8            0
-## sigma   0.1208 0.09403 0.1626 0.01726    28            0
+## alpha   3.2731 3.22863 3.3167 0.02240     1            0
+## beta    2.2002 2.01754 2.3850 0.09370     8            0
+## sigma   0.1206 0.09359 0.1581 0.01626    27            0
 ```
 
 ```r
@@ -644,7 +619,7 @@ trees_analysis <- jags_analysis(tree_model, data = trees)
 ```
 
 ```
-## Analysis converged (rhat:1)
+## Analysis converged (rhat:1.01)
 ```
 
 ```r
@@ -659,10 +634,10 @@ coef(trees_analysis)
 
 ```
 ##            estimate   lower  upper      sd error significance
-## alpha       3.27263 3.24345 3.3014 0.01495     1            0
-## beta        1.98276 1.82396 2.1452 0.07851     8            0
-## betaHeight  1.10994 0.70507 1.5275 0.21025    37            0
-## sigma       0.08458 0.06484 0.1119 0.01181    28            0
+## alpha       3.27198 3.24208 3.3020 0.01520     1            0
+## beta        1.98355 1.84042 2.1401 0.07743     8            0
+## betaHeight  1.11387 0.71211 1.5144 0.20486    36            0
+## sigma       0.08441 0.06537 0.1111 0.01177    27            0
 ```
 
 ```r
